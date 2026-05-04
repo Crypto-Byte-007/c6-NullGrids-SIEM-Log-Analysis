@@ -1,18 +1,8 @@
-#!/usr/bin/env python3
-"""
-Challenge 6 — Log Analysis
-Players browse realistic server logs, find the one anomalous entry,
-and decode it to get the flag.
-"""
-
-import re
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, render_template
+import re, os
 
 app = Flask(__name__)
 FLAG = open("flag.txt").read().strip()
-
-# Pre-built realistic web server log (2000 lines would be too much for static str,
-# so we generate it programmatically and cache it)
 
 import random, base64, hashlib
 from datetime import datetime, timedelta
@@ -77,21 +67,7 @@ LOG_CONTENT = make_log()
 
 @app.route("/")
 def index():
-    return """
-    <html><head><title>NullGrids Log Viewer</title></head>
-    <body style='font-family:monospace;background:#0a0a0a;color:#88ff88;padding:40px'>
-    <h1>NullGrids SIEM — Log Viewer</h1>
-    <p>Incident Report: Possible data exfiltration on 2026-03-15.</p>
-    <p>Analyze the server logs and find the anomaly.</p>
-    <br>
-    <p>Endpoints:</p>
-    <ul>
-      <li><a style='color:#88ff88' href='/logs'>GET /logs</a> — full access log</li>
-      <li><a style='color:#88ff88' href='/logs/search?q=POST'>GET /logs/search?q=TERM</a> — search logs</li>
-      <li>GET /logs/line/{n} — get specific line</li>
-    </ul>
-    </body></html>
-    """
+    return render_template("index.html")
 
 @app.route("/logs")
 def logs():

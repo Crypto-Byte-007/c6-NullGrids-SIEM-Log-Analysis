@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NullGrids SIEM | Log Analysis Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #050608;
+            --card-bg: #0d1117;
+            --primary: #00f2ff;
+            --primary-glow: rgba(0, 242, 255, 0.2);
+            --danger: #ff3e3e;
+            --warning: #ffb800;
+            --success: #00ff88;
+            --text-main: #e6edf3;
+            --text-dim: #8b949e;
+            --border: #30363d;
+            --transition: all 0.2s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Outfit', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Top Navigation */
+        nav {
+            padding: 15px 40px;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 800;
+            font-size: 20px;
+            color: var(--primary);
+            letter-spacing: 1px;
+        }
+
+        .system-status {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            font-size: 13px;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 12px;
+            background: rgba(0, 242, 255, 0.1);
+            border: 1px solid var(--primary);
+            border-radius: 20px;
+            color: var(--primary);
+        }
+
+        .status-pill.threat {
+            background: rgba(255, 62, 62, 0.1);
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        /* Sidebar & Main Layout */
+        .layout {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            overflow: hidden;
+        }
+
+        aside {
+            background: #090c10;
+            border-right: 1px solid var(--border);
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .sidebar-section h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+        }
+
+        .search-box {
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            background: #161b22;
+            border: 1px solid var(--border);
+            padding: 12px 16px;
+            border-radius: 8px;
+            color: #fff;
+            font-family: inherit;
+            outline: none;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        /* Log Table */
+        main {
+            padding: 30px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .log-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 12px;
+        }
+
+        th {
+            background: #161b22;
+            text-align: left;
+            padding: 12px 16px;
+            color: var(--text-dim);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 10px 16px;
+            border-bottom: 1px solid #1c2128;
+            white-space: nowrap;
+        }
+
+        tr:hover td {
+            background: rgba(0, 242, 255, 0.05);
+            cursor: pointer;
+        }
+
+        .ip-cell { color: var(--primary); }
+        .method-cell { font-weight: 700; }
+        .status-cell.s200 { color: var(--success); }
+        .status-cell.s404 { color: var(--warning); }
+        .status-cell.s500 { color: var(--danger); }
+
+        /* Detail Modal */
+        #detail-panel {
+            position: fixed;
+            right: -500px;
+            top: 0;
+            width: 450px;
+            height: 100vh;
+            background: #0d1117;
+            border-left: 2px solid var(--primary);
+            box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+            z-index: 200;
+            padding: 40px;
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        #detail-panel.active { right: 0; }
+
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .detail-row {
+            background: #161b22;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .detail-label {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .detail-value {
+            font-family: 'IBM Plex Mono', monospace;
+            word-break: break-all;
+            font-size: 13px;
+        }
+
+        /* Graphs */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #161b22;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-val { font-size: 24px; font-weight: 800; color: var(--primary); }
+        .stat-lab { font-size: 11px; color: var(--text-dim); }
+
+        /* Loading Animation */
+        .loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
+        }
+
+        .suspicious {
+            background: rgba(255, 62, 62, 0.1) !important;
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+            NULLGRIDS SIEM
+        </div>
+        <div class="system-status">
+            <div class="status-pill threat">Anomaly Detected</div>
+            <div class="status-pill">System: Encrypted</div>
+            <div style="color: var(--text-dim);">NG-SIEM-PRO-01</div>
+        </div>
+    </nav>
+
+    <div class="layout">
+        <aside>
+            <div class="sidebar-section">
+                <h3>Global Search</h3>
+                <div class="search-box">
+                    <input type="text" id="search-input" class="search-input" placeholder="Query (e.g. POST, 404, IP)...">
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Event Overview</h3>
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-val" id="total-logs">0</div>
+                        <div class="stat-lab">Total Events</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-val" style="color: var(--danger);">1</div>
+                        <div class="stat-lab">Anomalies</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Filter by Range</h3>
+                <div style="font-size: 13px; color: var(--text-dim); display: flex; flex-direction: column; gap: 10px;">
+                    <label><input type="checkbox" checked disabled> 10.0.0.0/8 (Internal)</label>
+                    <label><input type="checkbox" checked disabled> 172.16.0.0/12 (VPC)</label>
+                    <label><input type="checkbox" checked disabled> 192.168.0.0/16 (Office)</label>
+                </div>
+            </div>
+
+            <div style="margin-top: auto;">
+                <p style="font-size: 11px; color: #444; line-height: 1.4;">
+                    AUTHORIZED ACCESS ONLY.<br>
+                    INCIDENT ID: #INC-2026-0315-01<br>
+                    PRIMARY TARGET: EXFIL ANALYSIS
+                </p>
+            </div>
+        </aside>
+
+        <main>
+            <div class="log-container">
+                <table id="log-table">
+                    <thead>
+                        <tr>
+                            <th>LINE</th>
+                            <th>TIMESTAMP</th>
+                            <th>SOURCE IP</th>
+                            <th>METHOD</th>
+                            <th>PATH</th>
+                            <th>STATUS</th>
+                            <th>SIZE</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-body">
+                        <!-- Logs populated here -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="loader" id="loader">Processing logs...</div>
+        </main>
+    </div>
+
+    <!-- Detail Modal Overlay -->
+    <div id="detail-panel">
+        <div class="detail-header">
+            <h2 style="color: var(--primary);">EVENT DETAIL</h2>
+            <button onclick="closeDetail()" style="background:transparent; border:none; color:#fff; cursor:pointer; font-size:20px;">×</button>
+        </div>
+        
+        <div class="detail-row">
+            <div class="detail-label">Full Log Entry</div>
+            <div class="detail-value" id="det-full">...</div>
+        </div>
+
+        <div class="detail-row">
+            <div class="detail-label">User Agent</div>
+            <div class="detail-value" id="det-agent" style="color: var(--primary);">...</div>
+        </div>
+
+        <div class="detail-row">
+            <div class="detail-label">Exfiltration Flag Check</div>
+            <div class="detail-value" id="det-exfil">No encoded data detected in this entry.</div>
+        </div>
+
+        <div style="margin-top: auto; padding: 20px; border: 1px dashed var(--border); border-radius: 8px;">
+            <p style="font-size: 12px; color: var(--text-dim);">
+                Tip: Attackers often hide data in the User-Agent string. If you find a base64 encoded string, try to decode it.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const logBody = document.getElementById('log-body');
+        const searchInput = document.getElementById('search-input');
+        const detailPanel = document.getElementById('detail-panel');
+
+        async function loadLogs(query = '') {
+            try {
+                // If query is empty, we fetch /logs and parse it locally
+                // because /logs/search?q= doesn't work as 'all' in the current app.py
+                let response;
+                if(query) {
+                    response = await fetch(`/logs/search?q=${encodeURIComponent(query)}`);
+                    const data = await response.json();
+                    renderLogs(data.results.map(r => ({ i: r.line, content: r.content })));
+                } else {
+                    response = await fetch('/logs');
+                    const text = await response.text();
+                    const lines = text.split('\n').filter(l => l.trim()).map((l, i) => ({ i: i+1, content: l }));
+                    document.getElementById('total-logs').textContent = lines.length;
+                    renderLogs(lines);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function parseLogLine(line) {
+            // Regex for Apache-style log: 127.0.0.1 - - [10/Oct/2000:13:55:36 -0700] "GET /path HTTP/1.0" 200 2326
+            const match = line.match(/^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) (\S+) \S+" (\d+) (\d+) ".*" "(.*)"$/);
+            if(!match) return null;
+            return {
+                ip: match[1],
+                ts: match[2],
+                method: match[3],
+                path: match[4],
+                status: match[5],
+                size: match[6],
+                agent: match[7]
+            };
+        }
+
+        function renderLogs(logs) {
+            logBody.innerHTML = '';
+            logs.forEach(log => {
+                const parsed = parseLogLine(log.content);
+                if(!parsed) return;
+
+                const tr = document.createElement('tr');
+                if(parsed.ip === '185.220.101.47') tr.classList.add('suspicious');
+                
+                tr.innerHTML = `
+                    <td style="color:var(--text-dim)">#${log.i}</td>
+                    <td>${parsed.ts}</td>
+                    <td class="ip-cell">${parsed.ip}</td>
+                    <td class="method-cell">${parsed.method}</td>
+                    <td style="color: #fff">${parsed.path}</td>
+                    <td class="status-cell s${parsed.status}">${parsed.status}</td>
+                    <td style="color:var(--text-dim)">${parsed.size}</td>
+                `;
+                tr.onclick = () => showDetail(log.content, parsed);
+                logBody.appendChild(tr);
+            });
+        }
+
+        function showDetail(raw, parsed) {
+            detailPanel.classList.add('active');
+            document.getElementById('det-full').textContent = raw;
+            document.getElementById('det-agent').textContent = parsed.agent;
+            
+            const exfilMatch = parsed.agent.match(/exfil=([a-zA-Z0-9+/=]+)/);
+            const exfilDiv = document.getElementById('det-exfil');
+            if(exfilMatch) {
+                const encoded = exfilMatch[1];
+                exfilDiv.innerHTML = `
+                    <div style="color: var(--danger); font-weight: bold; margin-bottom: 10px;">ENCODED DATA DETECTED!</div>
+                    <div style="background: #000; padding: 10px; border-radius: 4px; border: 1px solid var(--danger);">
+                        ${encoded}
+                    </div>
+                    <button onclick="decodeAndShow('${encoded}')" style="margin-top: 10px; background: var(--primary); border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">DECODE VIA SIEM CORE</button>
+                `;
+            } else {
+                exfilDiv.textContent = "No encoded data detected in this entry.";
+            }
+        }
+
+        function decodeAndShow(b64) {
+            try {
+                const decoded = atob(b64);
+                alert("DECODED DATA RECOVERED:\n\n" + decoded);
+            } catch(e) {
+                alert("Decoding failed. Invalid encoding format.");
+            }
+        }
+
+        function closeDetail() {
+            detailPanel.classList.remove('active');
+        }
+
+        let searchTimeout;
+        searchInput.oninput = (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                loadLogs(e.target.value);
+            }, 300);
+        };
+
+        // Initial Load
+        loadLogs();
+    </script>
+</body>
+</html>
